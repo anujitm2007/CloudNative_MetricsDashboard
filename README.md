@@ -86,14 +86,18 @@ In terms of request response time, we can have an SLI of average request respons
 
 ## Creating SLI metrics.
 It is important to know why we want to measure certain metrics for our customer. Describe in detail 5 metrics to measure these SLIs. 
-```
-Below can be the 5 metrics to measure SLIs:
-1- Error rate: It is basically an indicator of downtime.
-2- Uptime: It is a direct mesaurement of our Service Availability during a period of time
-3- Latency: It is a metric to measure response time of the user an API offers.
-4- Traffic: It is a metric to measure the amount of traffic one is getting during periods of time.
-5- Network Capacity: It is a metric to handle the request of the usage of a service.
-```
+
+* Below can be the 5 metrics to measure SLIs:
+
+1- **Error rate:** It is basically an indicator of downtime. How much down-time is caused by the error rate and is under the Error Budget, which is the (100% uptime - SLO) - meaning that we should be under our allowed limits of a specific period of time. This metric is very important because Down Time is inevitable, but should be kept to minimum as it reflects the business and clients directly.
+
+2- **Uptime:** It is a direct mesaurement of our Service Availability during a period of time. All mterics are interrelated with the Uptime metric in one way or another, they can be some sort of a cause that effects this metric. It will also measure how much our service is accesible and serving properly during a peiod of time. We monitor and measure response times and available services by targeting certain ports/services.
+
+3- **Latency:** It is a metric to measure response time of the user an API offers. How much delay does the customer experience when interacting/using our service during a period of time. This is very important for the operation of business, as if left neglected can be cause of loosing clients, and it is dirct refelction of user experience.
+
+4- **Traffic:** It is a metric to measure the amount of traffic one is getting during periods of time. Here we measure how much traffic we are getting during periods of time, where, what kind of traffic, and where the traffic is coming from and what is targetting. This is getting to know the other side and what is coming on our system. Kind of request, ports, which service is being targeted the most, if we offer multiple services to the outside world through the API. Which API calls are most acctively, etc.
+
+5- **Network Capacity:** It is a metric to handle the request of the usage of a service. Even if we take care of Error Rate and Latency, if we don't have enough netowrk capacity and don't monitor how it is spent and what is causing spike on it, we eventually can lead to a road block of not being able to handel certain amount of network trrafic. Here we need to ensure that sufficient bandwidth is provisioned to meet our SLA/SLO targets of delay, jitter, loss, and availability of our Service.
 
 ## Create a Dashboard to measure our SLIs
 Create a dashboard to measure the uptime of the frontend and backend services We will also want to measure to measure 40x and 50x errors. Create a dashboard that show these values over a 24 hour period and take a screenshot.
