@@ -1,354 +1,142 @@
 **Note:** For the screenshots, you can store all of your answer images in the `answer-img` directory.
 
-
-## overview diagram
-
-```
-                    +-------------+
-                    | +---------+ |
-                  +-->| metrics |----+
- +------------+   | | +---------+ |  |   +--------------+
- | sample app |---+ |             |  +-->| visualization|
- +------------+   | | +---------+ |  |   +--------------+
-                  +-->| tracing |----+
-                    | +---------+ |
-                    +-------------+
-```
-
-* metrics       : prometheus
-* tracing       : jaeger
-* visualization : grafana
-
-
-## allow localhost to access k3s
-```
-export KUBECONFIG=descriptor/k3s.yaml
-kubectl version
-```
-
-## install helm
-```
-vagrant@anuj-machine:~> curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
-vagrant@anuj-machine:~> ls
-bin  get_helm.sh
-vagrant@anuj-machine:~> chmod 700 get_helm.sh
-vagrant@anuj-machine:~> ./get_helm.sh
-Downloading https://get.helm.sh/helm-v3.7.0-linux-amd64.tar.gz
-Verifying checksum... Done.
-Preparing to install helm into /usr/local/bin
-helm installed into /usr/local/bin/helm
-vagrant@anuj-machine:~> helm version
-version.BuildInfo{Version:"v3.7.0", GitCommit:"eeac83883cb4014fe60267ec6373570374ce770b", GitTreeState:"clean", GoVersion:"go1.16.8"}
-vagrant@anuj-machine:~>
-
-```
-
-## Installing Grafana and Prometheus
-```
-vagrant@anuj-machine:~> kubectl create namespace monitoring
-namespace/monitoring created
-vagrant@anuj-machine:~> kubectl get ns
-NAME              STATUS   AGE
-default           Active   28m
-kube-system       Active   28m
-kube-public       Active   28m
-kube-node-lease   Active   28m
-monitoring        Active   4s
-vagrant@anuj-machine:~> helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-"prometheus-community" has been added to your repositories
-vagrant@anuj-machine:~> helm repo add stable https://charts.helm.sh/stable
-"stable" has been added to your repositories
-vagrant@anuj-machine:~> helm repo update
-Hang tight while we grab the latest from your chart repositories...
-...Successfully got an update from the "prometheus-community" chart repository
-...Successfully got an update from the "stable" chart repository
-Update Complete. ⎈Happy Helming!⎈
-vagrant@anuj-machine:~> helm install prometheus prometheus-community/kube-prometheus-stack --namespace monitoring --kubeconfig /etc/rancher/k3s/k3s.yaml
-WARNING: Kubernetes configuration file is group-readable. This is insecure. Location: /etc/rancher/k3s/k3s.yaml
-WARNING: Kubernetes configuration file is world-readable. This is insecure. Location: /etc/rancher/k3s/k3s.yaml
-NAME: prometheus
-LAST DEPLOYED: Mon Sep 27 14:14:43 2021
-NAMESPACE: monitoring
-STATUS: deployed
-REVISION: 1
-NOTES:
-kube-prometheus-stack has been installed. Check its status by running:
-  kubectl --namespace monitoring get pods -l "release=prometheus"
-
-Visit https://github.com/prometheus-operator/kube-prometheus for instructions on how to create & configure Alertmanager and Prometheus instances using the Operator.
-vagrant@anuj-machine:~> kubectl get all -n monitoring
-NAME                                                         READY   STATUS    RESTARTS   AGE
-pod/prometheus-kube-state-metrics-696cf79768-xnpht           1/1     Running   0          75s
-pod/prometheus-kube-prometheus-operator-5c758db547-2hcxx     1/1     Running   0          75s
-pod/prometheus-prometheus-node-exporter-4kmn6                1/1     Running   0          75s
-pod/alertmanager-prometheus-kube-prometheus-alertmanager-0   2/2     Running   0          60s
-pod/prometheus-prometheus-kube-prometheus-prometheus-0       2/2     Running   0          59s
-pod/prometheus-grafana-57b5c4fdb6-x7wwp                      2/2     Running   0          75s
-
-NAME                                              TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)                      AGE
-service/prometheus-kube-prometheus-prometheus     ClusterIP   10.43.174.68    <none>        9090/TCP                     76s
-service/prometheus-kube-prometheus-operator       ClusterIP   10.43.144.114   <none>        443/TCP                      76s
-service/prometheus-kube-prometheus-alertmanager   ClusterIP   10.43.218.216   <none>        9093/TCP                     75s
-service/prometheus-prometheus-node-exporter       ClusterIP   10.43.57.150    <none>        9100/TCP                     75s
-service/prometheus-kube-state-metrics             ClusterIP   10.43.113.115   <none>        8080/TCP                     75s
-service/prometheus-grafana                        ClusterIP   10.43.188.95    <none>        80/TCP                       75s
-service/alertmanager-operated                     ClusterIP   None            <none>        9093/TCP,9094/TCP,9094/UDP   60s
-service/prometheus-operated                       ClusterIP   None            <none>        9090/TCP                     60s
-
-NAME                                                 DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
-daemonset.apps/prometheus-prometheus-node-exporter   1         1         1       1            1           <none>          75s
-
-NAME                                                  READY   UP-TO-DATE   AVAILABLE   AGE
-deployment.apps/prometheus-kube-state-metrics         1/1     1            1           75s
-deployment.apps/prometheus-kube-prometheus-operator   1/1     1            1           75s
-deployment.apps/prometheus-grafana                    1/1     1            1           75s
-
-NAME                                                             DESIRED   CURRENT   READY   AGE
-replicaset.apps/prometheus-kube-state-metrics-696cf79768         1         1         1       75s
-replicaset.apps/prometheus-kube-prometheus-operator-5c758db547   1         1         1       75s
-replicaset.apps/prometheus-grafana-57b5c4fdb6                    1         1         1       75s
-
-NAME                                                                    READY   AGE
-statefulset.apps/alertmanager-prometheus-kube-prometheus-alertmanager   1/1     60s
-statefulset.apps/prometheus-prometheus-kube-prometheus-prometheus       1/1     60s
-vagrant@anuj-machine:~>
-```
-
-## Install Jaeger
-```
-vagrant@anuj-machine:~> kubectl create namespace observability
-namespace/observability created
-vagrant@anuj-machine:~> kubectl get ns
-NAME              STATUS   AGE
-default           Active   31m
-kube-system       Active   31m
-kube-public       Active   31m
-kube-node-lease   Active   31m
-monitoring        Active   3m17s
-observability     Active   4s
-vagrant@anuj-machine:~> kubectl create -f https://raw.githubusercontent.com/jaegertracing/jaeger-operator/master/deploy/crds/jaegertracing.io_jaegers_crd.yaml
-customresourcedefinition.apiextensions.k8s.io/jaegers.jaegertracing.io created
-vagrant@anuj-machine:~> kubectl create -n observability -f https://raw.githubusercontent.com/jaegertracing/jaeger-operator/master/deploy/service_account.yaml
-serviceaccount/jaeger-operator created
-vagrant@anuj-machine:~> kubectl create -n observability -f https://raw.githubusercontent.com/jaegertracing/jaeger-operator/master/deploy/role.yaml
-role.rbac.authorization.k8s.io/jaeger-operator created
-vagrant@anuj-machine:~> kubectl create -n observability -f https://raw.githubusercontent.com/jaegertracing/jaeger-operator/master/deploy/role_binding.yaml
-rolebinding.rbac.authorization.k8s.io/jaeger-operator created
-vagrant@anuj-machine:~> kubectl create -n observability -f https://raw.githubusercontent.com/jaegertracing/jaeger-operator/master/deploy/operator.yaml
-deployment.apps/jaeger-operator created
-vagrant@anuj-machine:~> kubectl get all -n observability
-NAME                                 READY   STATUS    RESTARTS   AGE
-pod/jaeger-operator-dbf5767c-jjdcl   1/1     Running   0          41s
-
-NAME                              TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)             AGE
-service/jaeger-operator-metrics   ClusterIP   10.43.207.133   <none>        8383/TCP,8686/TCP   14s
-
-NAME                              READY   UP-TO-DATE   AVAILABLE   AGE
-deployment.apps/jaeger-operator   1/1     1            1           41s
-
-NAME                                       DESIRED   CURRENT   READY   AGE
-replicaset.apps/jaeger-operator-dbf5767c   1         1         1       41s
-vagrant@anuj-machine:~>
-```
-
-### Cluster wide Jaeger
-```
-vagrant@anuj-machine:~> kubectl create -f https://raw.githubusercontent.com/jaegertracing/jaeger-operator/master/deploy/cluster_role.yaml
-clusterrole.rbac.authorization.k8s.io/jaeger-operator created
-vagrant@anuj-machine:~> kubectl create -f https://raw.githubusercontent.com/jaegertracing/jaeger-operator/master/deploy/cluster_role_binding.yaml
-clusterrolebinding.rbac.authorization.k8s.io/jaeger-operator created
-vagrant@anuj-machine:~>
-```
-
-
-## deploying application
-```
-vagrant@anuj-machine:/vagrant/manifests> pwd
-/vagrant/manifests
-vagrant@anuj-machine:/vagrant/manifests> ls
-app  other
-vagrant@anuj-machine:/vagrant/manifests> tree
-.
-├── app
-│   ├── backend.yaml
-│   ├── frontend.yaml
-│   └── trial.yaml
-└── other
-    ├── elasticsearch.yaml
-    ├── grafana-svc.yaml
-    └── jaeger-elasticsearch.yaml
-
-2 directories, 6 files
-vagrant@anuj-machine:/vagrant/manifests>
-vagrant@anuj-machine:/vagrant/manifests> kubectl apply -f app/
-deployment.apps/backend-app created
-service/backend-service created
-deployment.apps/frontend-app created
-service/frontend-service created
-deployment.apps/trial-app created
-service/trial-service created
-vagrant@anuj-machine:/vagrant/manifests> kubectl get all
-NAME                               READY   STATUS              RESTARTS   AGE
-pod/backend-app-5f749755f4-2swb8   0/1     ContainerCreating   0          39s
-pod/backend-app-5f749755f4-rtk72   0/1     ContainerCreating   0          39s
-pod/backend-app-5f749755f4-lkctq   0/1     ContainerCreating   0          39s
-pod/svclb-backend-service-8q8wg    0/1     Pending             0          39s
-pod/frontend-app-75cd57cfd-tw8cp   0/1     ContainerCreating   0          39s
-pod/frontend-app-75cd57cfd-t2npv   0/1     ContainerCreating   0          39s
-pod/frontend-app-75cd57cfd-k2gvb   0/1     ContainerCreating   0          39s
-pod/svclb-trial-service-4bd7b      0/1     Pending             0          38s
-pod/trial-app-6cd98d67f4-c4f64     0/1     ContainerCreating   0          38s
-pod/trial-app-6cd98d67f4-nmx8j     0/1     ContainerCreating   0          38s
-pod/trial-app-6cd98d67f4-bfqwv     0/1     ContainerCreating   0          38s
-pod/svclb-frontend-service-dcsb7   1/1     Running             0          38s
-
-NAME                       TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
-service/kubernetes         ClusterIP      10.43.0.1       <none>        443/TCP          44m
-service/backend-service    LoadBalancer   10.43.222.163   <pending>     80:31202/TCP     39s
-service/trial-service      LoadBalancer   10.43.239.104   <pending>     8080:31417/TCP   38s
-service/frontend-service   LoadBalancer   10.43.232.173   10.0.2.15     8080:30136/TCP   39s
-
-NAME                                    DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
-daemonset.apps/svclb-backend-service    1         1         0       1            0           <none>          39s
-daemonset.apps/svclb-trial-service      1         1         0       1            0           <none>          38s
-daemonset.apps/svclb-frontend-service   1         1         1       1            1           <none>          39s
-
-NAME                           READY   UP-TO-DATE   AVAILABLE   AGE
-deployment.apps/backend-app    0/3     3            0           39s
-deployment.apps/frontend-app   0/3     3            0           39s
-deployment.apps/trial-app      0/3     3            0           39s
-
-NAME                                     DESIRED   CURRENT   READY   AGE
-replicaset.apps/backend-app-5f749755f4   3         3         0       39s
-replicaset.apps/frontend-app-75cd57cfd   3         3         0       39s
-replicaset.apps/trial-app-6cd98d67f4     3         3         0       38s
-vagrant@anuj-machine:/vagrant/manifests>
-```
-
-## exposing grafana
-```
-vagrant@anuj-machine:~> kubectl get pod -n monitoring | grep grafana
-prometheus-grafana-57b5c4fdb6-x7wwp                      2/2     Running   0          16m
-vagrant@anuj-machine:~>
-vagrant@anuj-machine:~> kubectl port-forward -n monitoring prometheus-grafana-57b5c4fdb6-x7wwp --address 0.0.0.0 3000
-Forwarding from 0.0.0.0:3000 -> 3000
-Handling connection for 3000
-Handling connection for 3000
-Handling connection for 3000
-Handling connection for 3000
-Handling connection for 3000
-Handling connection for 3000
-Handling connection for 3000
-```
-
-## exposing the application
-```
-vagrant@anuj-machine:~> kubectl port-forward svc/frontend-service 8080:8080
-Forwarding from 127.0.0.1:8080 -> 8080
-Forwarding from [::1]:8080 -> 8080
-```
-
-## additional
-```
-kubectl port-forward service/prometheus-grafana --address 0.0.0.0 3000:80 -n monitoring
-kubectl port-forward service/prometheus-kube-prometheus-prometheus --address 0.0.0.0 9090:9090 -n monitoring
-kubectl port-forward service/my-jaeger-tracing-query --address 0.0.0.0 16686:16686 -n observability
-```
-
-
 ## Verify the monitoring installation
 
-run `kubectl` command to show the running pods and services for all components. Take a screenshot of the output and include it here to verify the installation
-* [pod](answer-img/pods.png)
-* [service](answer-img/services.png)
+* run `kubectl` command to show the running pods and services for all components. Take a screenshot of the output and include it here to verify the installation
+
+vagrant@anuj-machine:~$ kubectl get po -n monitoring
+NAME                                                     READY   STATUS    RESTARTS   AGE
+prometheus-prometheus-node-exporter-ksdpq                1/1     Running   0          15h
+prometheus-kube-state-metrics-569d7854c4-czwqh           1/1     Running   0          15h
+prometheus-kube-prometheus-operator-86d499db8f-xwsnf     1/1     Running   0          15h
+prometheus-grafana-5cddc775c4-p4zrm                      2/2     Running   0          15h
+alertmanager-prometheus-kube-prometheus-alertmanager-0   2/2     Running   0          15h
+prometheus-prometheus-kube-prometheus-prometheus-0       2/2     Running   0          15h
+
+vagrant@anuj-machine:~$ kubectl get svc -n monitoring
+NAME                                      TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)                      AGE
+prometheus-kube-prometheus-prometheus     ClusterIP   10.43.107.6     <none>        9090/TCP                     15h
+prometheus-kube-prometheus-alertmanager   ClusterIP   10.43.160.159   <none>        9093/TCP                     15h
+prometheus-prometheus-node-exporter       ClusterIP   10.43.33.17     <none>        9100/TCP                     15h
+prometheus-kube-prometheus-operator       ClusterIP   10.43.236.238   <none>        443/TCP                      15h
+prometheus-kube-state-metrics             ClusterIP   10.43.230.132   <none>        8080/TCP                     15h
+alertmanager-operated                     ClusterIP   None            <none>        9093/TCP,9094/TCP,9094/UDP   15h
+prometheus-operated                       ClusterIP   None            <none>        9090/TCP                     15h
+prometheus-grafana                        NodePort    10.43.239.200   <none>        80:32330/TCP                 15h
+
+
+vagrant@anuj-machine:~$ kubectl get po -n observability
+NAME                                 READY   STATUS    RESTARTS   AGE
+my-jaeger-tracing-7d4967df8f-wpzqc   1/1     Running   2          3d14h
+simplest-746f54765d-xz69n            1/1     Running   2          4d14h
+jaeger-operator-694cbbb886-gvqlt     1/1     Running   1          5d14h
+
+vagrant@anuj-machine:~$ kubectl get svc -n observability
+NAME                      TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)             AGE
+jaeger-operator-metrics   ClusterIP   10.43.87.80   <none>        8383/TCP,8686/TCP   5d14h
+
+
+vagrant@anuj-machine:~$ kubectl get po
+NAME                            READY   STATUS    RESTARTS   AGE
+svclb-frontend-service-rc47g    1/1     Running   0          15h
+svclb-backend-service-rr4dp     1/1     Running   0          15h
+svclb-trial-service-8v6j5       1/1     Running   0          15h
+trial-app-68f7874888-p84vc      1/1     Running   0          15h
+backend-5ffd576b79-wrqgn        1/1     Running   0          15h
+frontend-app-5b4f56dc76-l8wsg   1/1     Running   0          15h
+
+vagrant@anuj-machine:~$ kubectl get svc
+NAME               TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)          AGE
+kubernetes         ClusterIP      10.43.0.1      <none>        443/TCP          71d
+frontend-service   LoadBalancer   10.43.79.149   10.0.2.15     8082:31762/TCP   15h
+backend-service    LoadBalancer   10.43.73.63    10.0.2.15     8081:32452/TCP   15h
+trial-service      LoadBalancer   10.43.45.81    10.0.2.15     8083:32290/TCP   15h
+
+* [All pods](answer-img/pods.png)
+* [All services](answer-img/services.png)
+
 
 ## Setup the Jaeger and Prometheus source
-Expose Grafana to the internet and then setup Prometheus as a data source. Provide a screenshot of the home page after logging into Grafana.
-* [grafana](answer-img/grafana.png)
+* Expose Grafana to the internet and then setup Prometheus as a data source. Provide a screenshot of the home page after logging into Grafana.
 
 ## Create a Basic Dashboard
-Create a dashboard in Grafana that shows Prometheus as a source. Take a screenshot and include it here.
-* [grafana dashboard](answer-img/basic_grafana_dashboard.png)
+* Create a dashboard in Grafana that shows Prometheus as a source. Take a screenshot and include it here.
 
 ## Describe SLO/SLI
-Describe, in your own words, what the SLIs are, based on an SLO of *monthly uptime* and *request response time*.
+* Describe, in your own words, what the SLIs are, based on an SLO of *monthly uptime* and *request response time*.
 
-A Service-Level Indicator (SLI) is a specific metric used to measure the performance of a service if it met its objective.
+SLI (Service Level Indicator) is basically a well defined quantitative measure of some level of service, in other words which can also be termed as "reality" metric.
+SLO (Service Level Objective) is like a target value of service level measured by SLI, or in other words a reliavility target any team wants to achieve. It is like a "desired reality" metric.
 
-For SLO (service Level Object) of monthly uptime of 99.9% every month. As for request response time, the average response time of a web request would take less than 1second to complete.
+Example: 
+In terms of Monthly uptime, lets say we have an SLI of 96.9% for the month of october 2021, for an SLO of 96% for the month of october 2021.
+In terms of request response time, we can have an SLI of average request response time of 188ms for the month of october 2021, for an SLO of 190ms of request response time for the month of october 2021.
+
 
 ## Creating SLI metrics.
-It is important to know why we want to measure certain metrics for our customer. Describe in detail 5 metrics to measure these SLIs. 
+* It is important to know why we want to measure certain metrics for our customer. Describe in detail 5 metrics to measure these SLIs. 
 
-* error rate
-* server/service uptime available for client access
-* http server error, example 5xx not available.
-* amount of traffic that webserver able to process before error start to appear.
-* misc monitoring such as disk usage, cpu/mem usage that indirectly affect client service.
+Below can be the 5 metrcis to measure SLIs:
+1- Error rate: It is basically an indicator of downtime.
+2- Uptime: It is a direct mesaurement of our Service Availability during a period of time
+3- Latency: It is a metric to measure response time of the user an API offers.
+4- Traffic: It is a metric to measure the amount of traffic one is getting during periods of time.
+5- Network Capacity: It is a metric to handle the request of the usage of a service.
 
 ## Create a Dashboard to measure our SLIs
-Create a dashboard to measure the uptime of the frontend and backend services We will also want to measure to measure 40x and 50x errors. Create a dashboard that show these values over a 24 hour period and take a screenshot.
+* Create a dashboard to measure the uptime of the frontend and backend services We will also want to measure to measure 40x and 50x errors. Create a dashboard that show these values over a 24 hour period and take a screenshot.
 * [app dashboard 1](answer-img/app_grafana_dashboard.png)
 * [app dashboard 2](answer-img/app_grafana_dashboard_2.png)
 
 ## Tracing our Flask App
-We will create a Jaeger span to measure the processes on the backend. Once you fill in the span, provide a screenshot of it here.
+*  We will create a Jaeger span to measure the processes on the backend. Once you fill in the span, provide a screenshot of it here.
 * [jaeger app](answer-img/jaeger_app.png)
 
 ## Jaeger in Dashboards
-Now that the trace is running, let's add the metric to our current Grafana dashboard. Once this is completed, provide a screenshot of it here.
-
+* Now that the trace is running, let's add the metric to our current Grafana dashboard. Once this is completed, provide a screenshot of it here.
 * [grafana displaying jaeger traces](answer-img/grafana_jaeger.png)
 
 ## Report Error
-Using the template below, write a trouble ticket for the developers, to explain the errors that you are seeing (400, 500, latency) and to let them know the file that is causing the issue.
+* Using the template below, write a trouble ticket for the developers, to explain the errors that you are seeing (400, 500, latency) and to let them know the file that is causing the issue.
 
 TROUBLE TICKET
-```
-Name          : posting to /star endpoint gave http 500
-Date          : 2021-11-06
-Subject       : mongodb resource is not setup
-Affected Area : backend application /star api endpoint
-Severity      : ERROR
-Description   : when hitting /star, mongodb is not setup.
-```
+
+Name: Backend Issues
+
+Date: 2021-11-15 / 1:00 am 
+
+Subject: mongodb setup is not done
+
+Affected Area: backend application /star api failing
+
+Severity: ERRORS
+
+Description: mongodb setup is not done
+
 
 ## Creating SLIs and SLOs
-We want to create an SLO guaranteeing that our application has a 99.95% uptime per month. Name three SLIs that you would use to measure the success of this SLO.
-
-* uptime
-* http requests rate
-* cpu usage
-* http requests times
+* We want to create an SLO guaranteeing that our application has a 99.95% uptime per month. Name three SLIs that you would use to measure the success of this SLO.
+1- Error rate
+2- Uptime
+3- Latency
 
 ## Building KPIs for our plan
-Now that we have our SLIs and SLOs, create KPIs to accurately measure these metrics. We will make a dashboard for this, but first write them down here.
+* Now that we have our SLIs and SLOs, create KPIs to accurately measure these metrics. We will make a dashboard for this, but first write them down here.
 
-### error rate
-* http requests exceptions by container
-* jaeger traces by container
-* error response rate per second
-* success response rate per second
-### server/service uptime available for client access
-* frontend service uptime
-* backend service uptime
-* trial service uptime
-### http server error, example 5xx not available.
-* frontend http 4xx and 5xx
-* backend http 4xx and 5xx
-* number of successful/failure requests per second
-### amount of traffic that webserver able to process before error start to appear.
-* average response time
-* median response time
-* 99th response time
-### misc monitoring such as disk usage, cpu/mem usage that indirectly affect client service.
-* cpu usage
-* memory usage
-* i/o usage
+1- Error Rate: It can be measured using- http requests exceptions by container, jaeger traces by container, error response rate per second, success response rate per second etc.
+
+2- Uptime (Total uptime for each service per Month which can be measured using frontend service/backend service/trial service uptime)
+
+3- Latency: It can be measured using- frontend http service for 4xx and 5xx, backend http service 4xx and 5xx, number of successful/failure requests per second etc.
 
 ## Final Dashboard
-Create a Dashboard containing graphs that capture all the metrics of your KPIs and adequately representing your SLIs and SLOs. Include a screenshot of the dashboard here, and write a text description of what graphs are represented in the dashboard.
-
+* Create a Dashboard containing graphs that capture all the metrics of your KPIs and adequately representing your SLIs and SLOs. Include a screenshot of the dashboard here, and write a text description of what graphs are represented in the dashboard.
 * [final dashboard](answer-img/final_dashboard.png)
 
-I have added description into the graph, please see [my dashboard](<reference-dashboards/my dashboard-1633452684132.json>)
+Dashboard contains below graphs:
+- Graphs showing Frontend/backend services uptime
+- Graphs showing jaeger tracing by containers
+- Graphs showing http requests, error/success response rate
+- Graphs showing memory/cpu/io usage
+- Graphs showing network traffic
+- Graphs showing frontend http service for 4xx and 5xx, backend http service 4xx and 5xx
